@@ -1,0 +1,37 @@
+name: Publish BusyMeter.Plugins to NuGet
+
+# Started by hand (Actions > Publish BusyMeter.Plugins to NuGet > Run workflow). NuGet Trusted Publishing: the
+# workflow trades GitHub's OIDC token for a short-lived NuGet key, so no API key is stored anywhere.
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Test
+        run: dotnet test dotnet/BusyMeter.Plugins.slnx -p:RestoreLockedMode=true
+
+      - name: Pack
+        run: dotnet pack dotnet/src/BusyMeter.Plugins/BusyMeter.Plugins.csproj -c Release -o out -p:RestoreLockedMode=true
+
+      - name: NuGet login
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: thebusymeter
+
+      - name: Push
+        run: dotnet nuget push out/*.nupkg --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json
