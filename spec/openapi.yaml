@@ -1,0 +1,743 @@
+openapi: 3.1.0
+info:
+  title: Busy Meter plugin API
+  version: 1.0.0
+  summary: Local API for programs that feed the Busy Meter status light.
+  description: >-
+    The Busy Meter Windows app hosts this API on 127.0.0.1 only, and only while the user has turned on
+    Settings > Sources > External connections (off by default). A program registers, the user clicks Allow in the
+    Busy Meter tray, and the program gets a bearer token. Plugins report signals (or a level) with a time to live;
+    the app combines them with its other sources. Levels are star counts 0-6 (0 = lip accent only) and "flash"
+    (the red/blue look). Requests must not carry an Origin header (browsers are refused), the Host header must be
+    exactly 127.0.0.1:<port> (bad_host; a few malformed ones are refused by Windows' HTTP server itself, 400 with a
+    non-JSON body), request lines are origin-form ("/v1/...") without query strings, and bodies are
+    application/json, at most 16 KB, nested
+    at most 8 deep and sent within 10 seconds (otherwise the connection is aborted without a response). Unknown
+    fields are ignored. The port is in %LOCALAPPDATA%\BusyMeter\plugin-api.json while the
+    API is listening (default 47820). Every error body is {"error": "<code>", "message": "<text>"}; the error codes
+    for each status are listed in x-error-codes. WebSocket messages on /v1/ws are described in ws-messages.schema.json.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://127.0.0.1:47820
+    description: Default port. The real one is in %LOCALAPPDATA%\BusyMeter\plugin-api.json.
+security:
+  - bearer: []
+tags:
+  - name: register
+  - name: signals
+  - name: status
+  - name: effects
+paths:
+  /v1/register:
+    post:
+      operationId: register
+      tags:
+        - register
+      summary: Ask the user to allow this program as a source.
+      description: >-
+        Starts an approval prompt in the Busy Meter tray. No API call can approve; the user clicks Allow or Deny,
+        and an unanswered prompt is denied after 2 minutes. Poll GET /v1/register/{requestId} for the answer.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Registration'
+      responses:
+        '202':
+          description: Waiting for the user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationPending'
+        '400':
+          description: Bad registration, Host header, request line (query string or absolute form) or JSON.
+          x-error-codes:
+            - bad_id
+            - bad_signal
+            - bad_level
+            - too_many_signals
+            - bad_request
+            - bad_json
+            - bad_host
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/ForbiddenOrigin'
+        '409':
+          description: A request for this id is already waiting, or the user has allowed 32 plugins.
+          x-error-codes:
+            - already_pending
+            - too_many_plugins
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          description: >-
+            10 registrations a minute overall (rate_limited), 3 waiting at most (too_many_pending), this id or
+            program was denied in the last 10 minutes (cooldown), or this id withdrew a request in the last 5 seconds
+            (withdraw_pause, with Retry-After 5).
+          x-error-codes:
+            - rate_limited
+            - too_many_pending
+            - cooldown
+            - withdraw_pause
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/Busy'
+  /v1/register/{requestId}:
+    get:
+      operationId: pollRegistration
+      tags:
+        - register
+      summary: The user's answer to a registration request.
+      description: >-
+        pending, denied (reason denied or expired), or approved with the token. The token is returned only once;
+        the next poll is 404. Answers are kept for 10 minutes.
+      security: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        '200':
+          description: The request's state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationState'
+        '400':
+          $ref: '#/components/responses/BadHost'
+        '403':
+          $ref: '#/components/responses/ForbiddenOrigin'
+        '404':
+          description: Unknown request, token already collected, or older than 10 minutes.
+          x-error-codes:
+            - not_found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/Busy'
+    delete:
+      operationId: withdrawRegistration
+      tags:
+        - register
+      summary: Withdraw a registration request that is still waiting for the user.
+      description: >-
+        Only while the request is pending: its prompt closes and the next poll is 404. Not a Deny (no 10-minute
+        cooldown), but the same id can't register again for 5 seconds (429 withdraw_pause), a 3rd withdrawal by the same
+        id or program (script hosts such as python.exe count per id only) within 10 minutes counts as a Deny, and withdrawals don't refund the registration limit. An
+        answered request is left as it is (409 already_answered): poll it to collect the answer. Right after the user
+        clicks Allow, while the token is being saved, this already says approved while a poll still says pending for a
+        moment; keep polling.
+      security: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 64
+      responses:
+        '200':
+          description: Withdrawn.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationWithdrawn'
+        '400':
+          $ref: '#/components/responses/BadHost'
+        '403':
+          $ref: '#/components/responses/ForbiddenOrigin'
+        '404':
+          description: Unknown request, token already collected, or older than 10 minutes.
+          x-error-codes:
+            - not_found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: The user already answered; nothing changed. Poll the request to collect the answer.
+          x-error-codes:
+            - already_answered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlreadyAnswered'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/Busy'
+  /v1/signals:
+    put:
+      operationId: setSignals
+      tags:
+        - signals
+      summary: Replace this plugin's active signals (or set a level) with a time to live.
+      description: >-
+        Replaces the whole active set. Without a refresh within ttlSeconds the set expires, so a crashed plugin can't
+        leave the meter stuck. An empty active list clears. Accepted while syncing is paused (status.paused is true).
+        Needs "signals" in the approval. 10 updates a second per plugin, shared with DELETE and WebSocket messages.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignalsRequest'
+      responses:
+        '200':
+          description: The active set now.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignalsReply'
+        '400':
+          description: Bad report, Host header, request line (query string or absolute form) or JSON.
+          x-error-codes:
+            - bad_ttl
+            - bad_signal
+            - unknown_signal
+            - too_many_signals
+            - bad_level
+            - bad_request
+            - bad_json
+            - bad_host
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Origin header sent, plugin switched off, or no "signals" in the approval.
+          x-error-codes:
+            - forbidden_origin
+            - plugin_off
+            - not_allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/UpdateRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/Busy'
+    delete:
+      operationId: clearSignals
+      tags:
+        - signals
+      summary: Clear this plugin's signals.
+      responses:
+        '200':
+          description: Cleared.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignalsReply'
+        '400':
+          $ref: '#/components/responses/BadHost'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Origin header sent, or plugin switched off.
+          x-error-codes:
+            - forbidden_origin
+            - plugin_off
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/UpdateRateLimited'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/Busy'
+  /v1/status:
+    get:
+      operationId: getStatus
+      tags:
+        - status
+      summary: The level the meter shows, whether syncing is paused, and the winning source's kind.
+      description: >-
+        Needs "status" in the approval. Never reveals names, event subjects, accounts, settings or other plugins' ids;
+        "plugin" is present only when the caller itself is the winner.
+      responses:
+        '200':
+          description: Current status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+        '400':
+          $ref: '#/components/responses/BadHost'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Origin header sent, plugin switched off, or no "status" in the approval.
+          x-error-codes:
+            - forbidden_origin
+            - plugin_off
+            - not_allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/Busy'
+  /v1/alert:
+    post:
+      operationId: alert
+      tags:
+        - effects
+      summary: Show one short fixed light effect on top of the current level.
+      description: >-
+        Needs "effects" in the approval. One alert per plugin every 10 seconds. The response comes when the effect is
+        over. Ignored (409) while paused, while Flash shows, while the meter is off, or when no meter is connected, a
+        Look preview or another alert is showing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRequest'
+      responses:
+        '200':
+          description: Shown.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertReply'
+        '400':
+          description: Bad effect, color, duration, Host header, request line (query string or absolute form) or JSON.
+          x-error-codes:
+            - bad_effect
+            - bad_color
+            - bad_duration
+            - bad_request
+            - bad_json
+            - bad_host
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Origin header sent, plugin switched off, or no "effects" in the approval.
+          x-error-codes:
+            - forbidden_origin
+            - plugin_off
+            - not_allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Ignored; message is one of: paused, flash, off, busy.'
+          x-error-codes:
+            - ignored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          description: One alert per plugin every 10 seconds.
+          x-error-codes:
+            - rate_limited
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/Busy'
+  /v1/ws:
+    get:
+      operationId: webSocket
+      tags:
+        - signals
+      summary: WebSocket for signals, status and taps (see ws-messages.schema.json).
+      description: >-
+        Send the token in the Authorization header of the upgrade request (no Origin). At most 4 sockets per plugin,
+        text JSON messages of at most 16 KB (closed with 1009 beyond). Closed with 1008 when the plugin is switched
+        off or revoked, or External connections goes off.
+      responses:
+        '101':
+          description: Switched to the WebSocket protocol.
+        '400':
+          description: Not a WebSocket upgrade, bad Host header, or a request line with a query string or in absolute form.
+          x-error-codes:
+            - bad_request
+            - bad_host
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Origin header sent, or plugin switched off.
+          x-error-codes:
+            - forbidden_origin
+            - plugin_off
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: The plugin already has 4 sockets open.
+          x-error-codes:
+            - too_many_sockets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/Internal'
+        '503':
+          $ref: '#/components/responses/Busy'
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: The 43-character token from an approved registration. Only in this header, never in a query string.
+  responses:
+    BadHost:
+      description: Host header isn't 127.0.0.1:<port>, or the request line has a query string or is in absolute form (http://...).
+      x-error-codes:
+        - bad_host
+        - bad_request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing, unknown or revoked token.
+      x-error-codes:
+        - unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ForbiddenOrigin:
+      description: The request carried an Origin header (web pages are refused).
+      x-error-codes:
+        - forbidden_origin
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooLarge:
+      description: The body is over 16 KB.
+      x-error-codes:
+        - too_large
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnsupportedMediaType:
+      description: Content-Type isn't application/json.
+      x-error-codes:
+        - unsupported_media_type
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UpdateRateLimited:
+      description: More than 10 updates a second for this plugin (PUT, DELETE and WebSocket messages together).
+      x-error-codes:
+        - rate_limited
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Internal:
+      description: A bug in the app (never expected; malformed input is always a 4xx).
+      x-error-codes:
+        - internal
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Busy:
+      description: >-
+        The caller's pool is full: 4 requests in flight without a valid token, 12 with one, or (on /v1/ws) 16 open
+        WebSockets for all plugins together.
+      x-error-codes:
+        - busy
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Level:
+      description: A star count 0-6 (0 = lip accent only) or "flash" (the red/blue look).
+      oneOf:
+        - type: integer
+          minimum: 0
+          maximum: 6
+        - type: string
+          const: flash
+    ShownLevel:
+      description: A level as the app reports it; "off" when paused or the meter is off.
+      oneOf:
+        - type: integer
+          minimum: 0
+          maximum: 6
+        - type: string
+          enum:
+            - flash
+            - 'off'
+    PluginId:
+      type: string
+      pattern: '^[a-z0-9.-]{3,64}$'
+    SignalName:
+      type: string
+      pattern: '^[a-z0-9-]{1,48}$'
+      description: Declared at registration. The shortcuts level-0 ... level-6 and level-flash exist for every plugin.
+    Want:
+      type: string
+      enum:
+        - signals
+        - status
+        - taps
+        - effects
+    Registration:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          $ref: '#/components/schemas/PluginId'
+        name:
+          type: string
+          description: Shown in the prompt; control characters removed, white space collapsed, cut to 64 characters.
+        version:
+          type: string
+        signals:
+          type: array
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/SignalDeclaration'
+        wants:
+          type: array
+          description: Unknown values are ignored; none means ["signals"].
+          items:
+            type: string
+    SignalDeclaration:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          allOf:
+            - $ref: '#/components/schemas/SignalName'
+          not:
+            pattern: '^level-'
+        label:
+          type: string
+          description: Cut to 64 characters.
+        suggest:
+          $ref: '#/components/schemas/Level'
+    RegistrationPending:
+      type: object
+      required:
+        - requestId
+        - state
+        - expiresInSeconds
+      properties:
+        requestId:
+          type: string
+          description: 22 characters, 128-bit random.
+        state:
+          type: string
+          const: pending
+        expiresInSeconds:
+          type: integer
+          const: 120
+    RegistrationState:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          enum:
+            - pending
+            - denied
+            - approved
+        reason:
+          type: string
+          enum:
+            - denied
+            - expired
+        pluginId:
+          $ref: '#/components/schemas/PluginId'
+        token:
+          type: string
+          description: Only on the first approved poll. 43 characters, base64url.
+    RegistrationWithdrawn:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          const: withdrawn
+    AlreadyAnswered:
+      type: object
+      required:
+        - error
+        - message
+        - state
+      properties:
+        error:
+          type: string
+          const: already_answered
+        message:
+          type: string
+        state:
+          type: string
+          enum:
+            - approved
+            - denied
+    SignalsRequest:
+      type: object
+      required:
+        - ttlSeconds
+      description: Send either active or level.
+      properties:
+        active:
+          type: array
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/SignalName'
+        level:
+          $ref: '#/components/schemas/Level'
+        ttlSeconds:
+          type: integer
+          minimum: 1
+          maximum: 600
+    SignalsReply:
+      type: object
+      required:
+        - active
+        - expiresInSeconds
+      properties:
+        active:
+          type: array
+          items:
+            type: string
+        expiresInSeconds:
+          type: integer
+          minimum: 0
+        status:
+          $ref: '#/components/schemas/Status'
+    Status:
+      type: object
+      required:
+        - level
+        - paused
+        - source
+      properties:
+        level:
+          $ref: '#/components/schemas/ShownLevel'
+        paused:
+          type: boolean
+        source:
+          type: string
+          enum:
+            - camera
+            - microphone
+            - teams
+            - slack
+            - calendar
+            - plugin
+            - manual
+            - none
+        plugin:
+          $ref: '#/components/schemas/PluginId'
+    AlertRequest:
+      type: object
+      required:
+        - effect
+      properties:
+        effect:
+          type: string
+          enum:
+            - lip-pulse
+            - star-sweep
+            - flash-short
+        color:
+          type: string
+          pattern: '^#?[0-9A-Fa-f]{6}$'
+          description: "#RRGGBB (the # is optional). Gold by default; not used by flash-short."
+        durationMs:
+          type: integer
+          minimum: 200
+          maximum: 3000
+          default: 1500
+    AlertReply:
+      type: object
+      required:
+        - shown
+      properties:
+        shown:
+          type: boolean
+          const: true
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string

@@ -1,0 +1,11 @@
+<Project>
+  <!-- Supply-chain rule: every project records the exact
+       package graph it restored (packages.lock.json), and release checks restore in locked mode. This file also stops
+       MSBuild from looking further up for another Directory.Build.props. -->
+  <PropertyGroup>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "busymeter"
+version = "0.2.0"
+description = "Client and MCP server for the Busy Meter status light's local plugin API"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "The Busy Meter authors" }]
+requires-python = ">=3.10"
+# The client (busymeter) and the bundled recipes (busymeter.recipes) use the standard library only. The MCP server
+# needs the official MCP SDK: install the "mcp" extra, e.g. pip install "busymeter[mcp]".
+dependencies = []
+keywords = ["busy light", "status light", "do not disturb", "mcp", "plugin"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: Microsoft :: Windows",
+]
+
+[project.optional-dependencies]
+mcp = ["mcp==2.3.0"]
+
+[project.scripts]
+busymeter = "busymeter.cli:main"
+busymeter-mcp = "busymeter_mcp.server:main"
+
+[project.urls]
+Homepage = "https://thebusymeter.com"
+Source = "https://github.com/RIPBillyMays/busy-meter-plugins"
+Issues = "https://github.com/RIPBillyMays/busy-meter-plugins/issues"
+
+[tool.setuptools]
+packages = ["busymeter", "busymeter.recipes", "busymeter_mcp"]

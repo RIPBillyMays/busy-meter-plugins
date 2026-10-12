@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thebusymeter.com/plugins/spec/ws-messages.schema.json",
+  "title": "Busy Meter plugin API WebSocket messages (v1)",
+  "description": "Text JSON messages on GET /v1/ws, at most 16 KB each. 'toServer' messages are sent by the plugin; 'toPlugin' messages are sent by the Busy Meter app. Unknown fields are ignored. The socket is closed with 1008 when the plugin is switched off or revoked or External connections goes off, and with 1009 when a message is over 16 KB.",
+  "oneOf": [
+    { "$ref": "#/$defs/toServer" },
+    { "$ref": "#/$defs/toPlugin" }
+  ],
+  "$defs": {
+    "level": {
+      "description": "A star count 0-6 (0 = lip accent only) or \"flash\" (the red/blue look).",
+      "oneOf": [
+        { "type": "integer", "minimum": 0, "maximum": 6 },
+        { "type": "string", "const": "flash" }
+      ]
+    },
+    "shownLevel": {
+      "description": "A level as the app reports it; \"off\" when paused or the meter is off.",
+      "oneOf": [
+        { "type": "integer", "minimum": 0, "maximum": 6 },
+        { "type": "string", "enum": ["flash", "off"] }
+      ]
+    },
+    "toServer": {
+      "oneOf": [
+        { "$ref": "#/$defs/signals" },
+        { "$ref": "#/$defs/clear" }
+      ]
+    },
+    "toPlugin": {
+      "oneOf": [
+        { "$ref": "#/$defs/ok" },
+        { "$ref": "#/$defs/error" },
+        { "$ref": "#/$defs/status" },
+        { "$ref": "#/$defs/tap" }
+      ]
+    },
+    "signals": {
+      "description": "Same as PUT /v1/signals: replace the active set (or set a level) with a time to live. Shares the 10 updates a second limit with PUT and DELETE.",
+      "type": "object",
+      "required": ["type", "ttlSeconds"],
+      "properties": {
+        "type": { "const": "signals" },
+        "active": { "type": "array", "maxItems": 32, "items": { "type": "string", "pattern": "^[a-z0-9-]{1,48}$" } },
+        "level": { "$ref": "#/$defs/level" },
+        "ttlSeconds": { "type": "integer", "minimum": 1, "maximum": 600 }
+      }
+    },
+    "clear": {
+      "description": "Same as DELETE /v1/signals.",
+      "type": "object",
+      "required": ["type"],
+      "properties": { "type": { "const": "clear" } }
+    },
+    "ok": {
+      "description": "Reply to signals or clear: the active set now. 'status' only for plugins approved with \"status\".",
+      "type": "object",
+      "required": ["type", "active", "expiresInSeconds"],
+      "properties": {
+        "type": { "const": "ok" },
+        "active": { "type": "array", "items": { "type": "string" } },
+        "expiresInSeconds": { "type": "integer", "minimum": 0 },
+        "status": { "$ref": "#/$defs/statusBody" }
+      }
+    },
+    "error": {
+      "description": "Reply to a message that wasn't accepted. Codes as PUT /v1/signals, plus rate_limited, plugin_off, not_allowed, bad_json and bad_request.",
+      "type": "object",
+      "required": ["type", "error", "message"],
+      "properties": {
+        "type": { "const": "error" },
+        "error": {
+          "type": "string",
+          "enum": ["bad_ttl", "bad_signal", "unknown_signal", "too_many_signals", "bad_level", "bad_request", "bad_json", "rate_limited", "plugin_off", "not_allowed"]
+        },
+        "message": { "type": "string" }
+      }
+    },
+    "statusBody": {
+      "type": "object",
+      "required": ["level", "paused", "source"],
+      "properties": {
+        "level": { "$ref": "#/$defs/shownLevel" },
+        "paused": { "type": "boolean" },
+        "source": { "type": "string", "enum": ["camera", "microphone", "teams", "slack", "calendar", "plugin", "manual", "none"] },
+        "plugin": { "type": "string", "description": "This plugin's own id, only when it is the winner." }
+      }
+    },
+    "status": {
+      "description": "Sent on connect and on every change, to plugins approved with \"status\".",
+      "allOf": [
+        { "$ref": "#/$defs/statusBody" },
+        { "type": "object", "required": ["type"], "properties": { "type": { "const": "status" } } }
+      ]
+    },
+    "tap": {
+      "description": "The meter's touch pad, to plugins approved with \"taps\".",
+      "type": "object",
+      "required": ["type", "gesture"],
+      "properties": {
+        "type": { "const": "tap" },
+        "gesture": { "type": "string", "enum": ["tap", "hold", "double"] }
+      }
+    }
+  }
+}

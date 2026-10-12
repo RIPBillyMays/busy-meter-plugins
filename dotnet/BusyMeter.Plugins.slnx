@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/BusyMeter.Plugins/BusyMeter.Plugins.csproj" />
+  <Project Path="tests/BusyMeter.Plugins.Tests/BusyMeter.Plugins.Tests.csproj" />
+</Solution>

@@ -1,0 +1,46 @@
+# Busy Meter
+
+> Busy Meter is a desk or doorway status light with six stars and a glowing lip along the bottom edge. It shows how busy its owner is: no stars (lip only) = free, 1 star = away, 2-6 stars = busier, and a red/blue "flash" (camera on). A free Windows app sets the level from Teams, Slack, calendars, the camera and microphone, and from local plugins through the open plugin API described here. The light runs WLED firmware on an ESP32-C3.
+
+Key facts for agents:
+
+- The plugin API is local only: `http://127.0.0.1:<port>/v1/`, hosted by the Busy Meter Windows app. The port is in `%LOCALAPPDATA%\BusyMeter\plugin-api.json` while it listens (default 47820). Nothing reaches it from other devices.
+- It is **off by default**. If a call can't connect, tell the user: "Turn on Settings → Sources → External connections in the Busy Meter app."
+- Every plugin needs the user's approval: `POST /v1/register`, then the user clicks **Allow** in the Busy Meter tray, then `GET /v1/register/{requestId}` returns a bearer token once. An agent can request, never approve.
+- Levels are star counts `0`-`6` (`0` = lip only) and `"flash"` (red/blue). There are no level names in the API; names are user labels.
+- Plugins report signals or a level with `ttlSeconds` 1-600 and refresh to keep it. The app maps them through the user's level map and combines them with its own sources, so a higher source can still win.
+- Requests must not send an `Origin` header (browsers are refused), bodies are `application/json` (16 KB max), no query strings. 10 updates a second per plugin.
+- `GET /v1/status` returns the shown level, whether syncing is paused and the winning source's kind (camera, microphone, teams, slack, calendar, plugin, manual, none). There is no endpoint that lists sources or mappings; they are on Settings → Levels in the app.
+- **Agents: never drive the meter's WLED directly while the Busy Meter app runs.** No HTTP or serial to the meter, no preset numbers. The app keeps any level set on the meter from outside as the user's manual level, so a direct write overrides the user's sources and fights the app. Always use the busymeter MCP tools or this plugin API. If the busymeter tools aren't available, tell the user to install or enable them (MCP server below) instead of working around it.
+- Without the app (Home Assistant, the user's own scripts), the meter runs on WLED presets. That path is for the user, not for agents.
+
+## API
+
+- [OpenAPI spec](https://thebusymeter.com/plugins/spec/openapi.yaml): every endpoint, error code and limit, as built
+- [WebSocket messages](https://thebusymeter.com/plugins/spec/ws-messages.schema.json): `/v1/ws` signals, status and touch-pad taps
+
+## MCP server
+
+- [busymeter-mcp](https://thebusymeter.com/plugins/python/README.md): MCP server over stdio. Tools: `get_status`, `list_sources`, `register_plugin`, `set_signals`, `set_level` (0-6 or "flash", with a TTL), `clear`, and for the bundled recipes `list_recipes`, `install_recipe`, `stop_recipe`, `uninstall_recipe`, `get_recipe_settings`, `set_recipe_settings`, `set_recipe_autostart`. Install with `pip install "busymeter[mcp]"`, then add the command `busymeter-mcp` to the MCP client (Claude Desktop: `mcpServers.busymeter` in `claude_desktop_config.json`; edit that file only while Claude Desktop is fully quit, because it rewrites the file while running).
+- `install_recipe` takes only a bundled recipe name (no paths, code or downloads), writes its default settings and starts it in the background; the user still clicks Allow in the tray. `set_recipe_settings` is checked against the recipe's schema; passwords and tokens are never shown or accepted (tell the user which settings file to edit). Recipes start at sign-in only when turned on: `set_recipe_autostart(name, on)` (Windows, bundled names only, off by default; one per-user Run entry per recipe, also `busymeter autostart <recipe> on|off`). Tell the user it will start every time they sign in; the first run still needs their Allow in the tray, and after a Deny it isn't started at sign-in again until turned on again (`signInSkipped`). It needs the package installed for the user (`pip install --user`). `list_recipes` shows `startsAtSignIn`; `uninstall_recipe` removes the entry.
+
+## Python client
+
+- [busymeter](https://thebusymeter.com/plugins/python/README.md): standard-library client: discovery, register and wait for Allow, token kept in a per-user file, `set_signals`, `set_level`, `clear`, `status`, `alert`, and the `busymeter level 5 --for 10m` command.
+
+## Recipes
+
+- [Recipes overview](https://thebusymeter.com/plugins/recipes/README.md): how to run them, what each reads and never reads, settings, how to stop them
+- [stream_status.py](https://thebusymeter.com/plugins/recipes/stream_status.py): OBS live → `live` (suggested 5), recording → `recording` (suggested 4), via OBS's built-in obs-websocket on 127.0.0.1
+- [game_state.py](https://thebusymeter.com/plugins/recipes/game_state.py): loopback receiver for games with an official game-state push feature; rules (path + equals/lt/gt/exists) → signals; [example config](https://thebusymeter.com/plugins/recipes/examples/game_state.example.json)
+- [focus_timer.py](https://thebusymeter.com/plugins/recipes/focus_timer.py): `busymeter focus 25m` or Pomodoro cycles → `focus` (suggested 2)
+- [vibe_meter.py](https://thebusymeter.com/plugins/recipes/vibe_meter.py): active Claude Code sessions or tokens/min → stars, `vibe-alert` (suggested flash) on a burst; reads only file metadata and usage token counts, never content
+- [level_from_cli.py](https://thebusymeter.com/plugins/recipes/level_from_cli.py): set a level for a while from the command line
+- [webhook_bridge.py](https://thebusymeter.com/plugins/recipes/webhook_bridge.py): local HTTP endpoint (127.0.0.1, shared secret) that maps POSTs to levels
+- [mic_loudness.py](https://thebusymeter.com/plugins/recipes/mic_loudness.py): more stars the louder the room; loudness only, never records audio
+
+## Optional
+
+- [Product site](https://thebusymeter.com): what the meter is, editions, setup guide
+- License: the spec, client, MCP server and recipes are MIT. The Busy Meter app itself is not open source.
+- Busy Meter is an original design, not affiliated with any game publisher.

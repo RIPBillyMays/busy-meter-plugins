@@ -1,0 +1,50 @@
+{
+  "name": "busymeter",
+  "version": "0.2.0",
+  "description": "Client for the Busy Meter status light's local plugin API (Node, no dependencies)",
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "busymeter": "bin/busymeter.js"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "lib/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.3"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "busy light",
+    "status light",
+    "do not disturb",
+    "plugin"
+  ],
+  "homepage": "https://thebusymeter.com",
+  "author": "The Busy Meter authors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RIPBillyMays/busy-meter-plugins.git",
+    "directory": "js"
+  },
+  "bugs": {
+    "url": "https://github.com/RIPBillyMays/busy-meter-plugins/issues"
+  },
+  "dependencies": {}
+}

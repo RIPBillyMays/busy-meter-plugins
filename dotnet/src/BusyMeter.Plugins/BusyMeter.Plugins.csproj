@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>BusyMeter.Plugins</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <PackageId>BusyMeter.Plugins</PackageId>
+    <Version>0.2.0</Version>
+    <Authors>The Busy Meter authors</Authors>
+    <Description>Client for the Busy Meter status light's local plugin API (127.0.0.1 only). No third-party packages.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>busy light;status light;do not disturb;plugin</PackageTags>
+    <PackageProjectUrl>https://thebusymeter.com</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/RIPBillyMays/busy-meter-plugins</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
+    <InternalsVisibleTo Include="BusyMeter.Plugins.Tests" />
+  </ItemGroup>
+
+</Project>

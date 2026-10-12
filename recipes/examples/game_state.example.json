@@ -1,0 +1,10 @@
+{
+  "_about": "Example settings for the game_state recipe. Field names are generic: change each path to the field your game's state feature sends (see its own docs). Copy into the game_state settings file (busymeter recipes shows where); keep your own token there.",
+  "port": 47822,
+  "max_body_kb": 64,
+  "stale_seconds": 30,
+  "rules": [
+    {"path": "round.phase", "equals": "live", "signal": "in-match", "label": "In a match", "suggest": 4},
+    {"path": "player.state.health", "lt": 30, "signal": "low-health", "label": "Low health", "suggest": "flash"}
+  ]
+}
