@@ -1,7 +1,7 @@
 # BusyMeter.Plugins (.NET)
 
 Client for the Busy Meter status light's local plugin API. MIT licensed. .NET 8 or later, no third-party packages
-(System.Text.Json only). A port of the Python client in `../python/busymeter` with the same rules, token files and
+(System.Text.Json only). A port of the [Python client](https://github.com/RIPBillyMays/busy-meter-plugins/tree/main/python) with the same rules, token files and
 messages, plus `WithdrawAsync`.
 
 Before anything works, turn on **Settings → Sources → External connections** in the Busy Meter app. When it's off

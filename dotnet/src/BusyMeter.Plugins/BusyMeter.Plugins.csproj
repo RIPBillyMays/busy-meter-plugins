@@ -7,7 +7,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
     <PackageId>BusyMeter.Plugins</PackageId>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Authors>The Busy Meter authors</Authors>
     <Description>Client for the Busy Meter status light's local plugin API (127.0.0.1 only). No third-party packages.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

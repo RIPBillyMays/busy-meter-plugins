@@ -90,7 +90,7 @@ busymeter autostart vibe_meter on   # Windows: start it every time you sign in (
 busymeter autostart            # which recipes start at sign-in
 ```
 
-Recipes, their settings files and what each one reads: `../recipes/README.md`. `python -m busymeter ...` works the
+Recipes, their settings files and what each one reads: [recipes/README.md](https://github.com/RIPBillyMays/busy-meter-plugins/blob/main/recipes/README.md). `python -m busymeter ...` works the
 same as the `busymeter` command.
 
 ## MCP server (`busymeter-mcp`)
