@@ -20,8 +20,9 @@ INSTRUCTIONS = (
     "plugins: install_recipe starts one now and the user clicks Allow in the tray; set_recipe_autostart makes one "
     "start at every Windows sign-in (off by default; tell the user plainly it will start each time they sign in); "
     "get_recipe_settings / set_recipe_settings change their thresholds and levels. Passwords and tokens are never shown or set here: the "
-    "user edits the settings file. Never drive the meter's WLED directly (no HTTP or serial to the meter, no "
-    "preset numbers): the app keeps such a level as the user's manual level, overriding their sources. "
+    "user edits the settings file. Never drive the meter directly (no serial/COM port, no HTTP to the meter, no "
+    "WLED presets): the app keeps such a level as the user's manual level, overriding their sources. A busy or "
+    "'access denied' COM port is the app using the meter; never ask the user to quit the app or unplug the meter. "
     "Use only these tools; if they fail or are missing, tell the user how to fix or enable them instead of working "
     "around them."
 )

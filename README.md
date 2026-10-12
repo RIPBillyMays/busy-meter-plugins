@@ -30,7 +30,8 @@ Python package docs, the MCP client config and token storage: `python/README.md`
 
 **Rule for AI agents and plugins:** never drive the meter's WLED directly while the Busy Meter app runs (no HTTP or
 serial to the meter, no preset numbers). The app keeps any level set on the meter from outside as the
-user's manual level, so a direct write overrides their sources. Always use the busymeter MCP tools or the plugin API. If
+user's manual level, so a direct write overrides their sources. A busy or "access denied" COM port means the app is
+using the meter over USB: never ask the user to quit the app or unplug the meter to get around it. Always use the busymeter MCP tools or the plugin API. If
 the busymeter tools aren't available, tell the user to install or enable them (below) instead of working around it.
 
 ## Use it from Claude Desktop

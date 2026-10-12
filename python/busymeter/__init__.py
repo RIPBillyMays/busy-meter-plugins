@@ -29,7 +29,7 @@ from .client import (
 )
 from .tokens import TokenStore, default_token_dir
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = [
     "API_VERSION", "NOT_RESPONDING_MESSAGE", "NOT_RUNNING_MESSAGE", "AppNotRespondingError", "DEFAULT_PORT", "EFFECTS", "LEVELS", "MAX_TTL_SECONDS", "TURN_ON_MESSAGE", "WANTS",
