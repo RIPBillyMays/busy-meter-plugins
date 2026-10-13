@@ -385,7 +385,10 @@ class ControlTests(unittest.TestCase):
                 self.assertFalse(marker.exists())  # the json.py planted in its working folder never ran
             finally:
                 if control.pid_alive(pid):
-                    os.kill(pid, 15)
+                    try:
+                        os.kill(pid, 15)
+                    except OSError:
+                        pass  # it exited between the check and the kill
 
     def test_an_early_crash_lands_in_the_log(self):
         def crashing(command, **kwargs):
