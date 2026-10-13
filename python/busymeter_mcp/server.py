@@ -44,7 +44,7 @@ def build_server(tools: Tools | None = None) -> Any:
     @server.tool()
     def get_status() -> dict[str, Any]:
         """What the Busy Meter shows now: level (0-6, "flash" or "off"), whether syncing is paused, the winning
-        source's kind (camera, microphone, teams, slack, calendar, plugin, manual, none), and whether External
+        source's kind (camera, microphone, teams, slack, calendar, plugin, agents, manual, none), and whether External
         connections is on."""
         return tools.get_status()
 

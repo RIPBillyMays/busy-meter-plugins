@@ -8,7 +8,9 @@
     busymeter run vibe_meter        # a bundled recipe: stream_status, game_state, focus_timer, vibe_meter
     busymeter focus 25m             # a focus block (--pomodoro for cycles)
     busymeter recipes               # which recipes are installed or running
+    busymeter install focus_timer   # write its default settings and start it in the background
     busymeter stop vibe_meter       # stop one running in the background
+    busymeter uninstall vibe_meter  # stop it and delete its settings, token and sign-in start
 
 The first run asks you to click Allow in the Busy Meter tray (needs Settings > Sources > External connections on).
 """

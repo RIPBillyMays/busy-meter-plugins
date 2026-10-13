@@ -83,7 +83,7 @@
       "properties": {
         "level": { "$ref": "#/$defs/shownLevel" },
         "paused": { "type": "boolean" },
-        "source": { "type": "string", "enum": ["camera", "microphone", "teams", "slack", "calendar", "plugin", "manual", "none"] },
+        "source": { "type": "string", "enum": ["camera", "microphone", "teams", "slack", "calendar", "plugin", "agents", "manual", "none"] },
         "plugin": { "type": "string", "description": "This plugin's own id, only when it is the winner." }
       }
     },

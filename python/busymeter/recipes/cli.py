@@ -2,15 +2,21 @@
 
     busymeter run <recipe>          # stream_status, game_state, focus_timer, vibe_meter; Ctrl+C clears and stops
     busymeter focus 25m             # one focus block; --pomodoro for cycles
-    busymeter recipes               # bundled recipes, running or not, and where their settings are
-    busymeter stop <recipe>         # stop one running in the background (it clears its signals)
+    busymeter recipes [--json]      # bundled recipes, running or not, and where their settings are
+    busymeter install <recipe>      # write its default settings and start it in the background
+    busymeter stop <recipe>         # stop one running in the background (it clears its signals; exit 1: not running)
+    busymeter uninstall <recipe>    # stop it, delete its settings, saved token and sign-in start
     busymeter autostart [<recipe> on|off]   # Windows: start a recipe at every sign-in (off by default)
+
+The Busy Meter app's Settings > Sources > Recipes rows run ``recipes --json``, ``install``, ``stop``, ``uninstall`` and
+``autostart`` (bundled names only) and read only the JSON and the exit codes.
 """
 
 from __future__ import annotations
 
 import argparse
 import io
+import json
 import sys
 import threading
 import time
@@ -40,24 +46,32 @@ def add_commands(sub: Any) -> None:
     focus.add_argument("--cycles", type=int, default=None, help="with --pomodoro: focus blocks to run (0 = until stopped)")
     focus.add_argument("--break", dest="short_break", default=None, help="short break length, e.g. 5m")
     focus.add_argument("--long-break", dest="long_break", default=None, help="long break length, e.g. 15m")
-    sub.add_parser("recipes", help="list the bundled recipes and whether they're running")
+    listing = sub.add_parser("recipes", help="list the bundled recipes and whether they're running")
+    listing.add_argument("--json", dest="as_json", action="store_true", help="print the list as JSON (for the app)")
+    install_cmd = sub.add_parser("install", help="write a recipe's default settings and start it in the background")
+    install_cmd.add_argument("recipe", choices=registry.names())
     stop_cmd = sub.add_parser("stop", help="stop a recipe running in the background")
     stop_cmd.add_argument("recipe", choices=registry.names())
+    uninstall_cmd = sub.add_parser("uninstall", help="stop a recipe and delete its settings, token and sign-in start")
+    uninstall_cmd.add_argument("recipe", choices=registry.names())
     auto = sub.add_parser("autostart", help="Windows: start a recipe every time you sign in (no arguments: list)")
     auto.add_argument("recipe", nargs="?", choices=registry.names())
     auto.add_argument("state", nargs="?", choices=("on", "off"))
 
 
 def handles(command: str) -> bool:
-    return command in ("run", "focus", "recipes", "stop", "autostart")
+    return command in ("run", "focus", "recipes", "install", "stop", "uninstall", "autostart")
 
 
 def dispatch(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     if args.command == "recipes":
-        return list_recipes()
+        return list_recipes_json() if args.as_json else list_recipes()
+    if args.command == "install":
+        return install(args.recipe)
+    if args.command == "uninstall":
+        return uninstall(args.recipe)
     if args.command == "stop":
-        print(stop(args.recipe)["message"])
-        return 0
+        return stop_command(args.recipe)
     if args.command == "autostart":
         if args.recipe is None:
             return list_autostart()
@@ -192,6 +206,44 @@ def list_recipes() -> int:
         if settings.exists():
             print(f"{'':14} settings: {settings.path}")
     return 0
+
+
+# What ``recipes --json`` prints for each recipe: names, flags and states only (no paths, messages or settings), so the
+# app has nothing to show raw. "version" changes only if a field's meaning does.
+JSON_FIELDS = ("name", "title", "pluginId", "installed", "running", "state", "startsAtSignIn", "signInSkipped")
+
+
+def list_recipes_json(manager: Any = None) -> int:
+    listed = (manager or _manager()).list_recipes()["recipes"]
+    print(json.dumps({"version": 1, "recipes": [{k: r[k] for k in JSON_FIELDS} for r in listed]}))
+    return 0
+
+
+def stop_command(name: str, stopper: Any = None) -> int:
+    """busymeter stop: exits 1 when nothing was running, so a caller (the app's Stop button) can tell."""
+    result = (stopper or stop)(name)
+    print(result["message"])
+    return 0 if result.get("wasRunning") else 1
+
+
+def install(name: str, manager: Any = None) -> int:
+    """Same as the MCP tool install_recipe: default settings, then a background start (the user clicks Allow)."""
+    result = (manager or _manager()).install_recipe(name)
+    print(result["message"], file=sys.stdout if result["ok"] else sys.stderr)
+    return 0 if result["ok"] else 1
+
+
+def uninstall(name: str, manager: Any = None) -> int:
+    """Same as the MCP tool uninstall_recipe: stop, clear, delete settings, token and sign-in start."""
+    result = (manager or _manager()).uninstall_recipe(name)
+    print(result["message"], file=sys.stdout if result["ok"] else sys.stderr)
+    return 0 if result["ok"] else 1
+
+
+def _manager() -> Any:
+    from .manage import Manager  # here, so `busymeter level` doesn't load it
+
+    return Manager()
 
 
 def _log_to_file(name: str) -> None:

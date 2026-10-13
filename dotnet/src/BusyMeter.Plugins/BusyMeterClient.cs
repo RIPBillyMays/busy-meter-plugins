@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -483,7 +484,7 @@ public sealed class BusyMeterClient : IDisposable
         }
         if (body is not null)
         {
-            var content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body));
+            var content = new ByteArrayContent(Encoding.UTF8.GetBytes(body.ToJsonString())); // no reflection: Native AOT safe
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             request.Content = content;
         }

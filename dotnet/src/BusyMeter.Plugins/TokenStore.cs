@@ -26,9 +26,9 @@ namespace BusyMeter.Plugins;
 /// </remarks>
 public sealed class TokenStore
 {
-    private static readonly JsonSerializerOptions FileJson = new()
+    private static readonly JsonWriterOptions FileJson = new()
     {
-        WriteIndented = true, // Python writes indent=2
+        Indented = true, // Python writes indent=2
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping, // a local file, never HTML: keep labels readable
     };
 
@@ -271,7 +271,8 @@ public sealed class TokenStore
                 options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
             using (var stream = new FileStream(temp, options))
             {
-                JsonSerializer.Serialize(stream, data, FileJson);
+                using (var writer = new Utf8JsonWriter(stream, FileJson)) // no reflection: Native AOT safe
+                    data.WriteTo(writer);
                 stream.Flush(flushToDisk: true);
             }
             File.Move(temp, target, overwrite: true);

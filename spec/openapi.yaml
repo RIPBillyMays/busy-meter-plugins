@@ -699,6 +699,7 @@ components:
             - slack
             - calendar
             - plugin
+            - agents
             - manual
             - none
         plugin:

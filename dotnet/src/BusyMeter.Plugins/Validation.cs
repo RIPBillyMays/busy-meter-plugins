@@ -148,7 +148,7 @@ public static partial class Validation
                 entry["label"] = signal.Label;
             if (signal.Suggest is MeterLevel suggest)
                 entry["suggest"] = suggest.ToJson();
-            list.Add(entry);
+            list.Add((JsonNode)entry); // the non-generic Add: safe for trimming and Native AOT
         }
         if (list.Count > 32)
             throw new ArgumentException("At most 32 signals.", nameof(signals));

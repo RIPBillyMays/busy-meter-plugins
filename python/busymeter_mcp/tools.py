@@ -30,7 +30,7 @@ WAITING_MESSAGE = (
     "Waiting for you to click Allow in the Busy Meter tray. The prompt names this plugin; it is denied after "
     "2 minutes without an answer."
 )
-SOURCE_KINDS = ("camera", "microphone", "teams", "slack", "calendar", "plugin", "manual", "none")
+SOURCE_KINDS = ("camera", "microphone", "teams", "slack", "calendar", "plugin", "agents", "manual", "none")
 LEVEL_SHORTCUTS = ("level-0", "level-1", "level-2", "level-3", "level-4", "level-5", "level-6", "level-flash")
 MAX_WAIT_SECONDS = 110  # keep a tool call well under typical client timeouts; call again to keep waiting
 REFRESH_TTL = 60

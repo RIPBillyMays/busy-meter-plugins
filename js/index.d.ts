@@ -6,7 +6,7 @@ export type Level = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 'flash';
 export type ShownLevel = Level | 'off';
 export type Want = 'signals' | 'status' | 'taps' | 'effects';
 export type Effect = 'lip-pulse' | 'star-sweep' | 'flash-short';
-export type SourceKind = 'camera' | 'microphone' | 'teams' | 'slack' | 'calendar' | 'plugin' | 'manual' | 'none';
+export type SourceKind = 'camera' | 'microphone' | 'teams' | 'slack' | 'calendar' | 'plugin' | 'agents' | 'manual' | 'none';
 
 export const DEFAULT_PORT: 47820;
 export const API_VERSION: 1;

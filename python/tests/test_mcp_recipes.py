@@ -191,6 +191,81 @@ class InstallTests(Base):
         self.assertEqual("start_failed", result["error"])
 
 
+class AppCommandTests(Base):
+    """The commands the Busy Meter app's Recipes rows run: recipes --json, install, uninstall."""
+
+    def run_cli(self, fn, *args):
+        import io
+        from contextlib import redirect_stderr, redirect_stdout
+        from busymeter.recipes import cli as recipes_cli
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = getattr(recipes_cli, fn)(*args, manager=self.manager)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_json_list_has_states_and_no_paths_or_messages(self):
+        self.tools.install_recipe("focus_timer")
+        self.manager.autostart.enable("focus_timer")
+        code, out, _ = self.run_cli("list_recipes_json")
+        self.assertEqual(0, code)
+        data = json.loads(out)
+        self.assertEqual(1, data["version"])
+        rows = {r["name"]: r for r in data["recipes"]}
+        self.assertEqual(["stream_status", "game_state", "focus_timer", "vibe_meter"], list(rows))
+        focus = rows["focus_timer"]
+        self.assertEqual({"name", "title", "pluginId", "installed", "running", "state", "startsAtSignIn", "signInSkipped"},
+                         set(focus))
+        self.assertEqual("com.thebusymeter.focus", focus["pluginId"])
+        self.assertTrue(focus["installed"] and focus["running"])
+        self.assertEqual("waiting_for_allow", focus["state"])
+        self.assertFalse(rows["vibe_meter"]["installed"])
+        self.assertNotIn(str(self.dir), out)
+
+    def test_install_and_uninstall_commands_use_the_manager(self):
+        code, out, _ = self.run_cli("install", "stream_status")
+        self.assertEqual(0, code)
+        self.assertIn("click Allow", out)
+        self.assertEqual(["stream_status"], self.launched)
+        code, out, _ = self.run_cli("uninstall", "stream_status")
+        self.assertEqual(0, code)
+        self.assertFalse((self.dir / "stream_status.json").exists())
+
+    def test_stop_exits_1_when_nothing_was_running(self):
+        import io
+        from contextlib import redirect_stdout
+        from busymeter.recipes import cli as recipes_cli
+        stopper = lambda name: self.stopper_result(name)
+        self.tools.install_recipe("focus_timer")
+        with redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(0, recipes_cli.stop_command("focus_timer", stopper=stopper))
+        self.assertIn("Stopped", out.getvalue())
+        with redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(1, recipes_cli.stop_command("focus_timer", stopper=stopper))
+        self.assertIn("isn't running", out.getvalue())
+
+    def stopper_result(self, name):
+        return self.manager.stop_recipe(name)
+
+    def test_a_failed_install_exits_1(self):
+        def broken(name):
+            raise OSError("no python")
+
+        self.manager = Manager(self.dir, launcher=broken, restrict=False, autostart=self.auto, settle=0.1)
+        code, out, err = self.run_cli("install", "focus_timer")
+        self.assertEqual(1, code)
+        self.assertIn("Couldn't start", err)
+
+    def test_the_parser_takes_bundled_names_only(self):
+        import io
+        from contextlib import redirect_stderr
+        from busymeter.cli import main
+        for command in ("install", "uninstall"):
+            with self.subTest(command=command), redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as raised:
+                    main([command, "../evil"])
+                self.assertEqual(2, raised.exception.code)
+
+
 class SettingsTests(Base):
     def test_get_shows_values_and_schema_but_never_secrets(self):
         self.tools.install_recipe("stream_status")

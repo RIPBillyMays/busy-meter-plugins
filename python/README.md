@@ -84,8 +84,10 @@ busymeter clear
 busymeter status
 busymeter run vibe_meter       # a bundled recipe: stream_status, game_state, focus_timer, vibe_meter
 busymeter focus 25m            # one focus block (--pomodoro for cycles)
-busymeter recipes              # bundled recipes: installed? running? settings file
+busymeter recipes              # bundled recipes: installed? running? settings file (--json for programs)
+busymeter install focus_timer  # write its default settings and start it in the background
 busymeter stop vibe_meter      # stop one running in the background (it clears its signals)
+busymeter uninstall vibe_meter # stop it; delete its settings, saved token and sign-in start
 busymeter autostart vibe_meter on   # Windows: start it every time you sign in (off by default; `off` undoes it)
 busymeter autostart            # which recipes start at sign-in
 ```
