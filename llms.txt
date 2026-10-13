@@ -45,5 +45,6 @@ Key facts for agents:
 ## Optional
 
 - [Product site](https://thebusymeter.com): what the meter is, editions, setup guide
+- [Source code](https://github.com/RIPBillyMays/busy-meter-plugins): the full MIT repo; the recipe files linked above are short launchers for the code in python/busymeter/recipes/.
 - License: the spec, client, MCP server and recipes are MIT. The Busy Meter app itself is not open source.
 - Busy Meter is an original design, not affiliated with any game publisher.
