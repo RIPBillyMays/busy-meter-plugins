@@ -508,8 +508,10 @@ class PermissionTests(Base):
         user = os.environ.get("USERNAME", "")
         for path in (folder, folder / "com.example.test.json", folder / "old.txt"):
             out = subprocess.run([busymeter.tokens._system32("icacls.exe"), str(path)], capture_output=True, text=True).stdout
-            for other in ("Everyone", "BUILTIN", "NT AUTHORITY", "Authenticated Users"):
-                self.assertNotIn(other, out, path)  # only the user's own entry is left
+            # Only the user is granted. SYSTEM, Administrators and OWNER RIGHTS may stay where the folder got them
+            # explicitly (Python 3.12.4+ creates temp folders that way, as on CI runners): they can read any file anyway.
+            for other in ("Everyone", "BUILTIN\\Users", "Authenticated Users", "INTERACTIVE"):
+                self.assertNotIn(other, out, path)
             self.assertIn(user, out, path)  # the user's own entry is there
             self.assertIn("(F)", out, path)
             if path == folder:

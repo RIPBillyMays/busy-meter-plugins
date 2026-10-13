@@ -4,7 +4,7 @@ Default folder (override with the BUSYMETER_TOKEN_DIR environment variable):
 
 - Windows: ``%LOCALAPPDATA%\\busymeter-plugins\\tokens``. Before every write the folder (also one named by
   BUSYMETER_TOKEN_DIR) loses its inherited permissions and grants only the current user, by SID from
-  ``whoami /user`` (``icacls``). If that fails a warning says so and the file is still written.
+  ``whoami /user`` (``icacls``); entries the folder already had explicitly (SYSTEM, Administrators) stay. If that fails a warning says so and the file is still written.
 - macOS/Linux: ``$XDG_CONFIG_HOME/busymeter-plugins/tokens`` (else ``~/.config/...``); the folder is set to 0700
   (also when it already existed with looser modes), files 0600.
 
